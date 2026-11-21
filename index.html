@@ -2910,6 +2910,7 @@ function rsDraw(){
 function rsOpen(){
   const p=rsCur();
   p.vals={}; p.mark={}; p.ansOn=false; rsLock=false;
+  $('#rsHint').style.minHeight='2.9em';            // はなまるの ときに とめた ふきだしの 高さを もとに もどす
   if(p.type==='zu'){ p.cuts.forEach(c=>c.on=false); rsSplit(p); } else { p.hs=0; p.hway=''; p.cvOn=false; p.moved=false; p.anim=false; rsBuild(p); }
   rsSel=(rsSlots(p)[0]||{}).id||null;
   rsDraw();
@@ -2973,6 +2974,7 @@ function rsCheck(){
     return;
   }
   if(all){
+    $('#rsHint').style.minHeight=$('#rsHint').offsetHeight+'px';   // ふきだしが ちぢんで 画面が 上に ぶれないように
     rsLock=true; rsSel=null; rsRenderSlots(); j.textContent='';
     if(p.type==='zu') rsDraw();                  // 線を もう おせないように
     $('#rsHint').innerHTML='よくできました！ 式も 答えも 合っています。';
@@ -2996,6 +2998,7 @@ function rsSikiJudge(btn){
   if(!on.length){ j.textContent='図を なぞって 線を ひこう'; return; }
   const inT=on.every(i=>p.target.includes(i));
   if(inT && on.length===p.target.length){
+    $('#rsHint').style.minHeight=$('#rsHint').offsetHeight+'px';   // ふきだしが ちぢんで 画面が 上に ぶれないように
     rsLock=true; rsDraw(); j.textContent='';
     $('#rsHint').innerHTML=`よくできました！ ${p.sikiText} の とおりに 分けられました。`;
     showMaru(); ping();
