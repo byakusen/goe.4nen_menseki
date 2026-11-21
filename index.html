@@ -2826,7 +2826,8 @@ function rsSetMode(m){
   rsStore[rsMode]={list:rsList, i:rsI};                 // いまの 小タブの 問題を おぼえておく
   rsMode=m;
   const s=rsStore[m];
-  if(s){ rsList=s.list; rsI=s.i; } else { rsList=[rsGen(0)]; rsI=0; }
+  /* 小タブを おすたびに 新しい 問題を 出す（前の 問題は「まえの問題」で もどれる） */
+  if(s){ rsList=s.list; rsI=rsList.length; rsList.push(rsGen(rsI,rsList[rsI-1])); } else { rsList=[rsGen(0)]; rsI=0; }
   document.querySelectorAll('#rsTabs .subtab').forEach(b=>b.setAttribute('aria-selected', b.dataset.m===m));
   rsHintOn=false; rsOpen();
 }
