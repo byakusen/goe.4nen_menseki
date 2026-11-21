@@ -278,6 +278,11 @@
     background:#F3F5F8;color:var(--ink-soft);text-align:center;font-variant-numeric:tabular-nums}
   .rsex.wide{min-width:190px;text-align:left;padding-left:calc(12px + .5em)}
   .rsline .tg.one{background:var(--red);color:#fff}
+  /* 式を見て 線をひく：お手本の 式 */
+  .rssiki{align-self:center;font-size:38px;font-weight:800;color:var(--indigo);background:#EAF3FC;
+    border:3px solid var(--indigo);border-radius:14px;padding:14px 30px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #rsTabs{flex-wrap:wrap;row-gap:6px}
+  #rsHint{min-width:200px}
   .rsguide{font-size:16px;font-weight:700;line-height:1.7;color:var(--ink);text-align:center}
   .rsguide b{color:var(--red)}
   @keyframes rsPen{to{stroke-dashoffset:0}}
@@ -286,7 +291,7 @@
   #rsPad button{font-size:18px;padding:8px 0}
   #rsPad button.op{color:var(--red);background:#FFF6F4}
   #rsJudge{height:22px;min-height:22px;overflow:hidden;font-size:13px}
-  @media (max-width:820px){ .rswork{width:290px} .rsline{font-size:19px} .rsslot{font-size:21px;min-height:44px} .rsslot.wide{min-width:120px} .rsex{font-size:17px} .rsex.wide{min-width:120px} }
+  @media (max-width:820px){ .rswork{width:290px} .rsline{font-size:19px} .rsslot{font-size:21px;min-height:44px} .rsslot.wide{min-width:120px} .rsex{font-size:17px} .rsex.wide{min-width:120px} .rssiki{font-size:26px;padding:10px 16px} }
 
   @media (max-width:820px){
     .side{width:180px} .board{gap:8px} .hd h1{font-size:16px}
@@ -649,6 +654,8 @@
     <button class="subtab" role="tab" data-m="tani" aria-selected="false">単位ちがい</button>
     <button class="subtab" role="tab" data-m="zu" aria-selected="false">組み合わせた形</button>
     <button class="subtab" role="tab" data-m="zu1" aria-selected="false">組み合わせた形（１つの式）</button>
+    <button class="subtab" role="tab" data-m="siki" aria-selected="false">式を見て 線をひく</button>
+    <button class="subtab" role="tab" data-m="michi" aria-selected="false">道のある花だん</button>
     <button class="subtab" role="tab" data-m="rnd" aria-selected="false">ランダム</button>
   </div>
   <div class="qrow">
@@ -2518,14 +2525,40 @@ function rsGenZu(kind){
   p.cuts=p.cuts.map(([x1,y1,x2,y2])=>({x1,y1,x2,y2,on:false}));
   return p;
 }
+/* 式を見て 線をひく：L字と「たて×横＋たて×横」の 式。式の とおりに 分けられたら 正解 */
+function rsGenSiki(){
+  let z;
+  for(let n=0;n<60;n++){
+    z=rsGenZu('L'); z.siki=true;
+    const dims=S=>{ z.cuts.forEach((c,i)=>c.on=S.includes(i)); rsSplit(z); return z.pieces.map(q=>[q.h,q.w]); };
+    const key=d=>d.map(x=>x.join('x')).sort().join('|');
+    if(key(dims([0]))===key(dims([1]))) continue;      // 横に 分けても たてに 分けても 同じ 式に なる 形は 使わない
+    const r=Math.random(), set = r<0.5 ? [0] : [1];      // 横か たて、どちらか 1本だけ（3つに 分ける 問題は 出さない）
+    z.target=set;
+    z.sikiText=dims(set).map(d=>d.join('×')).join('＋');
+    break;
+  }
+  z.cuts.forEach(c=>c.on=false); z.pieces=[]; z.valid=false; z.lines=null;
+  return z;
+}
+/* 道のある花だん：たて・横（または 両方）に はば d の 道。道を はしに よせると 1つの 長方形 */
+function rsGenMichi(){
+  const kind=['v','h','vh','vh'][RND(0,3)], d=RND(1,2), W=RND(7,12), H=RND(6,9);
+  const px=RND(2,W-d-2), py=RND(2,H-d-2), v=kind.includes('v'), h=kind.includes('h');
+  const tw=v?W-d:W, th=h?H-d:H;
+  return {type:'michi', W, H, d, px, py, v, h, tw, th, prod:tw*th};
+}
 const RS_KINDS=['hen','tani','L','U'];
 /* 小タブ：easy かんたん（辺）／tani 単位ちがい／zu 組み合わせた形（L・U を こうごに）／rnd ランダム */
 let rsMode='easy', rsStore={};
 function rsGen(i,prev){
   const k = rsMode==='easy' ? 'hen' : rsMode==='tani' ? 'tani' : (rsMode==='zu' || rsMode==='zu1') ? (i%2 ? 'U' : 'L')
+          : rsMode==='siki' ? 'siki' : rsMode==='michi' ? 'michi'
           : RS_KINDS[Math.floor(Math.random()*RS_KINDS.length)];
   if(k==='hen') return rsGenHen(prev);
   if(k==='tani') return rsGenTani();
+  if(k==='siki') return rsGenSiki();
+  if(k==='michi') return rsGenMichi();
   const z=rsGenZu(k);
   if(rsMode==='zu1') z.one=true;                   // 1つの式：見本の 3つの 式を 1つに まとめる
   return z;
@@ -2549,6 +2582,16 @@ function rsBuild(p){
                          && [[p.sh,p.sw],[p.sh*100,p.sw*100]].some(m=>rsSame(rsNums(s),m) && rsNear(rsEval(s),m[0]*m[1]))}]}
     ];
     if(p.ansOn) p.lines.push({tag:'答え', items:[{id:'ans',chk:s=>rsIsNum(s,p.prod)}, BU[p.unit].t]});   // 答えは 式が 合ってから
+  }else if(p.type==='michi'){
+    /* よせた 花だんの 長さ（「7」でも「8−1」でも よい）→ 式 → 答え */
+    const len=(id,tag,full,v)=>({tag, items:[{id, chk:s=>!s.includes('□') && rsNear(rsEval(s),v)
+                                   && (rsIsNum(s,v) || (s.includes('−') && rsSame(rsNums(s),[full,p.d])))}, 'm']});
+    p.lines=[];
+    if(p.v) p.lines.push(len('w','横の長さ',p.W,p.tw));
+    if(p.h) p.lines.push(len('h','たての長さ',p.H,p.th));
+    p.lines.push({tag:'式', items:[{id:'e',wide:true,chk:s=>!s.includes('□') && s.includes('×')
+                                     && rsSame(rsNums(s),[p.tw,p.th]) && rsNear(rsEval(s),p.prod)}]});
+    if(p.ansOn) p.lines.push({tag:'答え', items:[{id:'ans',chk:s=>rsIsNum(s,p.prod)}, `m${SUP2}`]});
   }
 }
 /* 辺の長さの 式の しゅるい：'box'（□×9＝45）／'div'（45÷9 または 45÷9＝5）／false（まちがい） */
@@ -2616,6 +2659,7 @@ function rsSplit(p){
   p.pieces=pcs;
   p.valid = on.length>0 && pcs.length>=2 && pcs.every(q=>q.rect);
   p.lines=null;
+  if(p.siki) return;                               // 式を見て 線をひく：式の 欄は 使わない
   if(p.valid){
     const areas=pcs.map(q=>q.w*q.h), tot=areas.reduce((s,v)=>s+v,0), U=`${p.u}${SUP2}`;
     if(p.one){                                     // 見本（書いてある 式）＋ 1つの式
@@ -2725,6 +2769,43 @@ function rsFigZu(p){
   s+=`<g id="rsPenLive"></g>`;
   return {vb:`-82 -52 ${w+164} ${h+100}`, s, left:true};
 }
+/* 道のある花だん：下の 道の 色の 上に 緑の 花だんを ならべる。よせると 右・下の 花だんが 左・上へ うごき、道が はしに 出る */
+function rsFigMichi(p){
+  const sc=Math.min(380/p.W,270/p.H), w=p.W*sc, h=p.H*sc, X=v=>v*sc, d=p.d;
+  const xs = p.v ? [[0,p.px],[p.px+d,p.W]] : [[0,p.W]];
+  const ys = p.h ? [[0,p.py],[p.py+d,p.H]] : [[0,p.H]];
+  const from = p.anim ? !p.moved : p.moved;        // うごかす ときは もとの 位置から かいて、あとで うごかす
+  let s=`<g>`;
+  s+=`<rect x="0" y="0" width="${w}" height="${h}" fill="#E6DDCB"/>`;
+  xs.forEach(([x0,x1],i)=>ys.forEach(([y0,y1],k)=>{
+    const dx=i?-X(d):0, dy=k?-X(d):0;
+    s+=`<g class="rsmv" data-dx="${dx}" data-dy="${dy}" style="transform:translate(${from?dx:0}px,${from?dy:0}px)">`+
+       `<rect x="${X(x0)}" y="${X(y0)}" width="${X(x1-x0)}" height="${X(y1-y0)}" fill="var(--fill-2)" stroke="#5E9B6E" stroke-width="2"/></g>`;
+  }));
+  s+=`<rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="var(--edge)" stroke-width="3.5"/>`;
+  s+=rsArcT(w,64)+rsTag(w/2,-33,`${p.W}m`,24);
+  s+=rsArcL(h,110)+rsTag(-66,h/2,`${p.H}m`,24);
+  /* 道の はば（よせた ときは はしの 道に 書く） */
+  if(p.v){ const a=X(p.moved?p.W-d:p.px), b=a+X(d);
+    s+=`<path d="M${a},${h+6} v10 M${b},${h+6} v10 M${a},${h+11} H${b}" stroke="var(--red)" stroke-width="2" fill="none"/>`+
+       `<text x="${(a+b)/2}" y="${h+38}" text-anchor="middle" font-size="20" font-weight="800" fill="var(--red)">${d}m</text>`; }
+  if(p.h){ const a=X(p.moved?p.H-d:p.py), b=a+X(d);
+    s+=`<path d="M${w+6},${a} h10 M${w+6},${b} h10 M${w+11},${a} V${b}" stroke="var(--red)" stroke-width="2" fill="none"/>`+
+       `<text x="${w+22}" y="${(a+b)/2+7}" font-size="20" font-weight="800" fill="var(--red)">${d}m</text>`; }
+  if(p.moved && rsHintOn){                          // ヒント：よせた 花だんの わく
+    s+=`<rect x="0" y="0" width="${X(p.tw)}" height="${X(p.th)}" fill="none" stroke="var(--indigo)" stroke-width="3" stroke-dasharray="8 6"/>`;
+  }
+  s+=`</g>`;
+  return {vb:`-150 -80 ${w+230} ${h+140}`, s, after:g=>{
+    if(!p.anim) return;
+    p.anim=false;
+    g.getBoundingClientRect();                     // いまの 位置を きめてから うごかす
+    g.querySelectorAll('.rsmv').forEach(el=>{
+      el.style.transition='transform .8s ease';
+      el.style.transform = p.moved ? `translate(${el.dataset.dx}px,${el.dataset.dy}px)` : 'translate(0px,0px)';
+    });
+  }};
+}
 
 /* ---- 画面 ---- */
 let rsList=[rsGen(0)], rsI=0, rsSel=null, rsHintOn=false, rsTimer=null, rsLock=false;
@@ -2732,6 +2813,11 @@ const rsCur=()=>rsList[rsI];
 function rsWorkHTML(p){
   const any = p.type==='zu' && p.cuts.some(c=>c.on);
   const erase = (any && !rsLock) ? `<button class="btn" id="rsErase" style="align-self:center">✏️ 線を けして やりなおす</button>` : '';
+  if(p.siki){                                      // 式を見て 線をひく
+    return `<div class="rsguide">この 式に なるように、図を なぞって<br><b>線を ひきましょう。</b></div>`+
+      `<div class="rssiki">${p.sikiText}</div>`+erase;
+  }
+  const mv = p.type==='michi' ? `<button class="btn" id="rsMove" style="align-self:center">${p.moved?'↩️ もとに もどす':'🚚 道を はしに よせる'}</button>` : '';
   if(!p.lines){
     return `<div class="rsguide">✏️ 図の 分けたい ところを<br>ゆびや マウスで <b>なぞって 線を ひきましょう。</b>`+
       (any?`<br><span style="font-size:14px;color:var(--ink-soft)">まだ 長方形に なっていない ところが あるよ</span>`:'')+`</div>`+erase;
@@ -2739,7 +2825,7 @@ function rsWorkHTML(p){
   /* これから 出てくる 段の ぶんも 見えない 段で 場所を とっておく（段が ふえても 上の 式が うごかない） */
   const ghost = p.type==='hen' ? 3-p.lines.length : (p.ansOn ? 0 : 1);
   const ghosts = `<div class="rsline" style="visibility:hidden" aria-hidden="true"><span class="tg">－</span><span class="rsslot" data-s="">　</span></div>`.repeat(Math.max(0,ghost));
-  return erase + p.lines.map(L=>`<div class="rsline"><span class="tg${L.tag?'':' sp'}${L.cls?' '+L.cls:''}">${L.tag||'－'}</span>`+
+  return erase + mv + p.lines.map(L=>`<div class="rsline"><span class="tg${L.tag?'':' sp'}${L.cls?' '+L.cls:''}">${L.tag||'－'}</span>`+
     L.items.map(it=>typeof it==='string' ? `<span>${it}</span>`
       : it.ex!==undefined ? `<span class="rsex${it.wide?' wide':''}">${it.ex}</span>`
       : `<button class="rsslot${it.wide?' wide':''}" data-s="${it.id}" aria-pressed="false">　</button>`).join('')+`</div>`).join('') + ghosts;
@@ -2774,6 +2860,14 @@ function rsHintText(p){
                                       : `たてと横の 長さの 単位が ちがいます。そのまま かけても いいかな？（${p.src} を おすと 書きなおせるよ）`;
   if(p.shape==='U' && !p.valid) return rsHintOn ? `青い 点線の ところ（上の あいている ところ）を なぞって 線を ひこう。`
                                : `上の あいている ところを とじると、大きい 長方形に なります。`;
+  if(p.type==='michi') return rsHintOn
+    ? `よせると、${p.v&&p.h?'たても 横も':p.v?'横が':'たてが'} 道の はば ${p.d}m だけ みじかく なるよ。`
+    : `道を はしに よせると、緑の 花だんが 1つの 長方形に なるよ。`;
+  if(p.siki){
+    const [h,w]=p.sikiText.split('＋')[0].split('×');
+    return rsHintOn ? `式の 「${h}×${w}」は たて ${h}・横 ${w} の 長方形です。図の 中で さがそう。`
+                    : `式の かけ算 1つが、長方形 1つの 「たて × 横」です。`;
+  }
   if(p.one && p.valid) return rsHintOn
     ? (p.shape==='U' ? `大きい長方形の 式 − 小さい長方形の 式 と つなぐと 1つの式に なります。かけ算は 先に 計算します。`
                      : `分けた 長方形の 式（たて × 横）を ＋ で つなぐと 1つの式に なります。かけ算は 先に 計算します。`)
@@ -2787,19 +2881,24 @@ function rsHintText(p){
 }
 function rsDraw(){
   const p=rsCur();
-  const F = p.type==='hen' ? rsFigHen(p) : p.type==='tani' ? rsFigTani(p) : rsFigZu(p);
+  const F = p.type==='hen' ? rsFigHen(p) : p.type==='tani' ? rsFigTani(p) : p.type==='michi' ? rsFigMichi(p) : rsFigZu(p);
   const g=$('#rsFig'); g.setAttribute('viewBox',F.vb); g.innerHTML=F.s;
+  if(F.after) F.after(g);
   g.setAttribute('preserveAspectRatio', F.left ? 'xMinYMid meet' : 'xMidYMid meet');
-  g.style.cursor = (p.type==='zu' && !rsLock && !p.valid) ? 'none' : '';   // 分けおわったら えんぴつは いらない
+  g.style.cursor = (p.type==='zu' && !rsLock && (!p.valid || p.siki)) ? 'none' : '';   // 分けおわったら えんぴつは いらない
   if(p.type==='hen'){
     const kn=p.known==='t'?'たて':'横', un=p.known==='t'?'横':'たて';
     $('#rsTitle').innerHTML=`面積が ${p.A}cm${SUP2} で、${kn}の長さが ${p.k}cm の 長方形を かくには、${un}の長さを 何cm に すれば よいですか。`;
   }else if(p.type==='tani'){
     $('#rsTitle').innerHTML=`たてが ${p.lt}、横が ${p.ly} の 長方形の 形をした 花だんの 面積は 何${BU[p.unit].t} ですか。`;
+  }else if(p.type==='michi'){
+    $('#rsTitle').innerHTML=`たて ${p.H}m、横 ${p.W}m の 花だんに、はば ${p.d}m の 道が あります。緑の ところの 面積は 何m${SUP2} ですか。`;
+  }else if(p.siki){
+    $('#rsTitle').innerHTML=`下のような 形を、「${p.sikiText}」の 式に なるように 長方形に 分けましょう。`;
   }else{
     $('#rsTitle').innerHTML=`下のような 形の 面積は 何${p.u}${SUP2} ですか。<span class="q2">（${p.one?'線を ひいてから、1つの 式に まとめよう':`まず 線を ひいて ${p.shape==='U'?'考えよう':'長方形に 分けよう'}`}）</span>`;
   }
-  $('#rsNo').textContent = p.type==='hen'?1 : p.type==='tani'?2 : 3;
+  $('#rsNo').textContent = p.type==='hen'?1 : p.type==='tani'?2 : p.type==='michi'?4 : 3;
   $('#rsCount').textContent=`${rsI+1}問め`;
   $('#rsHint').innerHTML=rsHintText(p);
   $('#rsHintBtn').textContent = rsHintOn?'💡 ヒントをけす':'💡 ヒント';
@@ -2811,7 +2910,7 @@ function rsDraw(){
 function rsOpen(){
   const p=rsCur();
   p.vals={}; p.mark={}; p.ansOn=false; rsLock=false;
-  if(p.type==='zu'){ p.cuts.forEach(c=>c.on=false); rsSplit(p); } else { p.hs=0; p.hway=''; p.cvOn=false; rsBuild(p); }
+  if(p.type==='zu'){ p.cuts.forEach(c=>c.on=false); rsSplit(p); } else { p.hs=0; p.hway=''; p.cvOn=false; p.moved=false; p.anim=false; rsBuild(p); }
   rsSel=(rsSlots(p)[0]||{}).id||null;
   rsDraw();
 }
@@ -2850,6 +2949,7 @@ function rsKey(k){
 function rsCheck(){
   const p=rsCur(), j=$('#rsJudge'); if(rsLock) return;
   j.style.color='var(--indigo)';
+  if(p.siki){ rsSikiJudge(true); return; }
   if(!p.lines){ j.textContent='まず 線を ひいて 長方形に 分けよう'; return; }
   const sl=rsSlots(p), empty=sl.find(s=>!p.vals[s.id]);
   if(empty){ j.textContent='まだ 入っていない ところが あるよ'; rsSel=empty.id; rsRenderSlots(); return; }
@@ -2884,7 +2984,98 @@ function rsCheck(){
     CH.miss();
     rsSel=sl.find(s=>p.mark[s.id]==='ng').id; rsRenderSlots();
     j.textContent='赤い ところを なおそう'; j.style.color='var(--red)';
+    const why=rsWhy(p,rsSel,p.vals[rsSel]||'');   // まちがい方に あわせて ふきだしで 声を かける
+    if(why) $('#rsHint').innerHTML=why;
   }
+}
+/* 式を見て 線をひく：ひいた 線が 式の 分け方と 同じか（btn：こたえあわせを おした とき） */
+function rsSikiJudge(btn){
+  const p=rsCur(), j=$('#rsJudge'); if(rsLock) return;
+  j.style.color='var(--indigo)';
+  const on=p.cuts.map((c,i)=>c.on?i:-1).filter(i=>i>=0);
+  if(!on.length){ j.textContent='図を なぞって 線を ひこう'; return; }
+  const inT=on.every(i=>p.target.includes(i));
+  if(inT && on.length===p.target.length){
+    rsLock=true; rsDraw(); j.textContent='';
+    $('#rsHint').innerHTML=`よくできました！ ${p.sikiText} の とおりに 分けられました。`;
+    showMaru(); ping();
+    clearTimeout(rsTimer);
+    CH.done();
+    if(!CH.isOn()) rsTimer=setTimeout(()=>rsGo(1),1700);
+    return;
+  }
+  if(inT){ j.textContent='いいね！ あと 1本 線を ひこう'; return; }
+  CH.miss();
+  const now = p.valid ? p.pieces.map(q=>`${q.h}×${q.w}`).join('＋') : '';
+  $('#rsHint').innerHTML = now
+    ? `この 分け方だと 式は ${now} に なるよ。「${p.sikiText}」の たて・横に なる 長方形を さがそう。`
+    : `まだ 長方形に なっていない ところが あるよ。`;
+  j.textContent='線を けして やりなおそう'; j.style.color='var(--red)';
+}
+/* まちがい方に あわせた 声かけ（あてはまらない ときは ''） */
+function rsWhy(p,id,s){
+  const has=c=>s.includes(c), num=/^\d+(\.\d+)?$/.test(s);
+  if(p.type!=='hen' && has('＝')) return '＝ は 書かなくて いいよ。式だけ 書こう。';
+  if(p.type==='hen'){
+    const {k,A,ans}=p, L=s.split('＝')[0];
+    if(id==='ans') return num ? `たしかめよう：${s} × ${k} は ${A} に なるかな？` : '答えは 数だけ 書こう。';
+    if(L.includes('□') && !has('＝') && rsNear(rsEval(L,ans),A)) return `「＝ ${A}」まで 書こう。□ × ${k} ＝ ${A} の ように、面積と つなぎます。`;
+    if(id==='e2' && L.includes('×')) return '□ を もとめるのは わり算だよ。';
+    if(L.includes('÷') && rsSame(rsNums(L),[A,k]) && !rsNear(rsEval(L),ans)) return `わる数と わられる数が 反対だよ。面積の ${A} を ${k} で わります。`;
+    if(!L.includes('□') && L.includes('×') && rsSame(rsNums(L),[A,k])) return `${A} × ${k} だと 面積より 大きく なるよ。わからない 長さを □ に するか、わり算で もとめよう。`;
+    if(has('＋')||has('−')) return '面積は たて × 横。たし算や ひき算では ないよ。';
+    return '';
+  }
+  if(p.type==='tani'){
+    if(id==='c') return p.dst==='m' ? '100cm ＝ 1m だよ。' : '1m ＝ 100cm だよ。';
+    if(id==='e'){
+      if(has('＋')||has('−')) return '面積は たて × 横。かけ算で もとめよう。';
+      if(rsSame(rsNums(s),[parseInt(p.lt),parseInt(p.ly)])) return `単位が そろっていないよ。${p.lt} と ${p.ly} を、m か cm の どちらかに そろえてから かけよう。`;
+      return '';
+    }
+    if(id==='ans'){
+      if(p.unit==='m2' && rsIsNum(s,p.sh*p.sw*10000)) return `それは cm${SUP2} の 数だよ。10000cm${SUP2} ＝ 1m${SUP2} だから、m${SUP2} に なおそう。`;
+      if(p.unit==='cm2' && rsIsNum(s,p.sh*p.sw)) return `それは m${SUP2} の 数だよ。1m${SUP2} ＝ 10000cm${SUP2} だから、cm${SUP2} に なおそう。`;
+      return '式を もう一度 計算して たしかめよう。';
+    }
+    return '';
+  }
+  if(p.type==='michi'){
+    if(id==='w'||id==='h'){
+      const full=id==='w'?p.W:p.H;
+      if(rsIsNum(s,full)) return `道の はば ${p.d}m の ぶんを ひこう。`;
+      if(rsIsNum(s,full+p.d)) return '道の はばは たすのでは なく、ひくよ。';
+      return '「道を はしに よせる」を おして、緑の ところの 長さを 見てみよう。';
+    }
+    if(id==='e'){
+      if(rsSame(rsNums(s),[p.W,p.H])) return 'それは 道も 入れた 全体の 面積だよ。上で もとめた 長さで かけよう。';
+      if(has('＋')||has('−')) return '面積は たて × 横。かけ算で もとめよう。';
+      return '上で もとめた たてと横の 長さで かけ算しよう。';
+    }
+    if(id==='ans') return '式を もう一度 計算して たしかめよう。';
+    return '';
+  }
+  if(p.type==='zu'){
+    const U=p.shape==='U';
+    if(id==='ans') return '答えは 上で 計算した 面積と 同じ 数に なるよ。';
+    if(p.one && id==='e1'){                        // 1つの式
+      if(!has('×')) return U ? '「ひくと」の 式を そのまま 書いて いるよ。大きい・小さい の 「たて × 横」の 式で つなごう。'
+                             : '「あわせて」の 式を そのまま 書いて いるよ。見本の 「たて × 横」の 式を ＋ で つなごう。';
+      if(U && !has('−')) return '大きい 長方形の 式 − 小さい 長方形の 式 だよ。';
+      if(!U && s.split('＋').length!==p.pieces.length) return `分けた 長方形は ${p.pieces.length}つ。かけ算の 式も ${p.pieces.length}つ ＋ で つなぐよ。`;
+      const tot=U ? p.W*p.H-p.nw*p.nh : p.pieces.reduce((t,q)=>t+q.w*q.h,0);
+      if(rsNear(rsEval(s),tot)) return '面積は 合っているけど、見本の 「たて × 横」の 長さで 式を つくろう。';
+      return '見本の 式を よく 見て、1つずつ 書きうつそう。';
+    }
+    if(/^r/.test(id)){                             // ＝ の あとの 数
+      const e=p.vals[id.replace(/^r/,'e')]||'';
+      return (e.includes('×') && /[＋−]/.test(e)) ? 'かけ算を 先に 計算するよ。もう一度 計算しよう。' : 'となりの 式を もう一度 計算しよう。';
+    }
+    if(id==='et') return U ? '大きい 長方形の 面積 − 小さい 長方形の 面積 だよ。' : '上で もとめた 面積を ＋ で たそう。';
+    if(!has('×')) return '面積は たて × 横。かけ算で もとめよう。';
+    return 'その 長方形の たてと横の 長さを 図で たしかめよう（ヒントを おすと 図に 書くよ）。';
+  }
+  return '';
 }
 /* なぞって 線を ひく：なぞった 向きと 場所に いちばん 近い「分けられる 線」に ぴったり あわせる */
 const RS_PEN_IMG = document.getElementById('enpituImg').src;           // えんぴつ（先が 左上）
@@ -2903,7 +3094,7 @@ function rsPenLive(){
     `<image href="${RS_PEN_IMG}" x="${L.x}" y="${L.y}" width="${rsDrag.pw}" height="${rsDrag.pw*RS_PEN_AR}" style="pointer-events:none"/>`;
 }
 $('#rsFig').addEventListener('pointerdown',e=>{
-  const p=rsCur(); if(p.type!=='zu' || rsLock || p.valid) return;
+  const p=rsCur(); if(p.type!=='zu' || rsLock || (p.valid && !p.siki)) return;
   const q=rsPt(e); if(!q) return;
   e.preventDefault();
   const m=$('#rsFig').getScreenCTM();
@@ -2915,7 +3106,7 @@ $('#rsFig').addEventListener('pointerdown',e=>{
 function rsPenHover(e){
   const el=document.getElementById('rsPenLive'), p=rsCur(), g=$('#rsFig');
   if(!el) return;
-  if(p.type!=='zu' || rsLock || p.valid || e.pointerType==='touch'){ el.innerHTML=''; return; }
+  if(p.type!=='zu' || rsLock || (p.valid && !p.siki) || e.pointerType==='touch'){ el.innerHTML=''; return; }
   const q=rsPt(e), m=g.getScreenCTM(); if(!q) return;
   const pw=110/((m&&m.a)||1);
   el.innerHTML=`<image href="${RS_PEN_IMG}" x="${q.x}" y="${q.y}" width="${pw}" height="${pw*RS_PEN_AR}" style="pointer-events:none"/>`;
@@ -2932,7 +3123,7 @@ function rsPenEnd(){
   if(!rsDrag) return;
   const p=rsCur(), P=rsDrag.pts, A=P[0], B=P[P.length-1], sc=p.sc;
   rsDrag=null;
-  $('#rsFig').style.cursor = (rsLock || p.valid) ? '' : 'none';
+  $('#rsFig').style.cursor = (rsLock || (p.valid && !p.siki)) ? '' : 'none';
   const el=document.getElementById('rsPenLive'); if(el) el.innerHTML='';
   const dx=B.x-A.x, dy=B.y-A.y;
   if(Math.hypot(dx,dy)<14) return;                 // ちょっと さわった だけ
@@ -2957,6 +3148,7 @@ function rsPenEnd(){
   rsSel=(rsSlots(p)[0]||{}).id||null;
   rsDraw();
   p.lastCut=null;                                  // えんぴつで かく 動きは 1回だけ
+  if(p.siki){ rsSikiJudge(false); return; }        // 式を見て 線をひく：ひいた たびに しらべる
   if(p.valid){ j.textContent = p.one ? '見本を 見て 1つの 式に まとめよう' : p.shape==='U' ? '大きい 長方形が できたね！' : '分けられたね！ 式を 立てよう'; j.style.color='var(--indigo)'; }
 }
 ['pointerup','pointercancel'].forEach(ev=>$('#rsFig').addEventListener(ev,rsPenEnd));
@@ -2968,6 +3160,9 @@ $('#rsFig').addEventListener('click',e=>{
   if(e.target.closest('#rsCvLbl') && !p.cvOn){ p.cvOn=true; rsSel='c'; rsDraw(); }
 });
 $('#rsWork').addEventListener('click',e=>{
+  if(e.target.closest('#rsMove')){                  // 道を はしに よせる／もどす
+    const p=rsCur(); p.moved=!p.moved; p.anim=true; rsDraw(); return;
+  }
   if(e.target.closest('#rsErase')){
     const p=rsCur(); p.cuts.forEach(c=>c.on=false); p.vals={}; p.mark={}; p.ansOn=false;
     rsSplit(p); rsSel=null; rsDraw(); return;
@@ -3050,7 +3245,7 @@ window.TEST_SETTEI = {
   button: '📝 テストの 練習',
   parts: {
     after  : '#chal-mount',
-    next   : '#mqNext,#kqNext,#rqNext,#bqNext,#cvNext,#msNext,#wNew',
+    next   : '#mqNext,#kqNext,#rqNext,#bqNext,#cvNext,#msNext,#wNew,#rsNext',
     hint   : '#testHintProxy',
     tabs   : '.tabs,.subtabs .subtab,.seg button',
     chalBtn: '#btn-challenge'
@@ -3075,7 +3270,14 @@ window.TEST_SETTEI = {
       { no:'大問1', mode:'ookii'    },
       { no:'大問2', mode:'ooyou'    },
       { no:'大問3', mode:'tani'     },
-      { no:'大問4', mode:'machigai' } ] }
+      { no:'大問4', mode:'machigai' } ] },
+    { title:'立式の テスト', items:[
+      { no:'大問1', mode:'rs_hen'   },
+      { no:'大問2', mode:'rs_tani'  },
+      { no:'大問3', mode:'rs_zu'    },
+      { no:'大問4', mode:'rs_one'   },
+      { no:'大問5', mode:'rs_siki'  },
+      { no:'大問6', mode:'rs_michi' } ] }
   ]
 };
 </script>
@@ -3107,7 +3309,7 @@ window.TEST_SETTEI = {
   var hit = function(id){ var e = document.getElementById(id); if(e) e.click(); };
 
   /* テスト中は「つぎの問題」を「とばす」に 見た目も かえる（はたらきは ②が かえている） */
-  var NEXTS = '#mqNext,#kqNext,#rqNext,#bqNext,#cvNext,#msNext,#wNew', LABEL = {};
+  var NEXTS = '#mqNext,#kqNext,#rqNext,#bqNext,#cvNext,#msNext,#wNew,#rsNext', LABEL = {};
   new MutationObserver(function(){
     var on = document.body.classList.contains('testing');
     document.querySelectorAll(NEXTS).forEach(function(b){
@@ -3135,7 +3337,19 @@ window.TEST_SETTEI = {
     tani    : { label:'単位の へんかん',
                 open:function(){ hit('t4'); hit('bl4'); cvGo(1); } },
     machigai: { label:'まちがいさがし',
-                open:function(){ hit('t6'); msGo(1); } }
+                open:function(){ hit('t6'); msGo(1); } },
+    rs_hen  : { label:'立式 ― かんたん（辺の長さ）',
+                open:function(){ hit('t7'); rsSetMode('easy'); } },
+    rs_tani : { label:'立式 ― 単位ちがい',
+                open:function(){ hit('t7'); rsSetMode('tani'); } },
+    rs_zu   : { label:'立式 ― 組み合わせた形',
+                open:function(){ hit('t7'); rsSetMode('zu'); } },
+    rs_one  : { label:'立式 ― 組み合わせた形（１つの式）',
+                open:function(){ hit('t7'); rsSetMode('zu1'); } },
+    rs_siki : { label:'立式 ― 式を見て 線をひく',
+                open:function(){ hit('t7'); rsSetMode('siki'); } },
+    rs_michi: { label:'立式 ― 道のある花だん',
+                open:function(){ hit('t7'); rsSetMode('michi'); } }
   };
 
   /* いま ひらいている 小タブ（テストを やめたとき ここへ もどる） */
@@ -3146,6 +3360,7 @@ window.TEST_SETTEI = {
     if(h('p3')) return 'kufuu';
     if(h('p4')) return h('bqConv') ? 'tani' : (h('bqQuiz') ? (bqLv === 'adv' ? 'ooyou' : 'ookii') : null);
     if(h('p6')) return 'machigai';
+    if(h('p7')) return ({easy:'rs_hen', tani:'rs_tani', zu:'rs_zu', zu1:'rs_one', siki:'rs_siki', michi:'rs_michi'})[rsMode] || 'rs_hen';
     return null;                       /* 形づくり・解説・辺と面積 は テストに 出さない */
   }
   window.mode = guess() || 'menseki';
